@@ -32,6 +32,10 @@ Unlike normal supervised training, you don't want either loss to just steadily d
 
 This project uses the simplest possible GAN (MLP layers only, no convolutions) to keep the architecture easy to follow. It's more prone to instability and mode collapse than fancier variants (DCGAN, WGAN, etc.), but that's a fair tradeoff for a first GAN implementation.
 
+**Label smoothing:** training the discriminator on real images target `0.9` instead of a full `1.0` (`--label-smoothing`, default `0.9`) keeps it from getting overconfident too early — an overconfident discriminator gives the generator a weak, uninformative gradient, which is one of the things that pushes a GAN toward mode collapse. We tried just training longer first (75 epochs vs. 25) and it didn't help — the discriminator only got stronger, not weaker — so label smoothing was added instead.
+
+**Result:** label smoothing did what it's supposed to do — D loss and G loss both plateaued instead of drifting further apart (D loss stayed around 0.27-0.30 instead of dropping to 0.13 like the un-smoothed 75-epoch run). But sample diversity didn't meaningfully improve — generated digits still cluster around a few shapes. That's a useful, honest result for a course project: it shows label smoothing fixes the *training stability* symptom, but mode collapse in a plain MLP GAN is a deeper architectural limitation that needs a structurally different fix (minibatch discrimination, a conv-based DCGAN, or similar) — out of scope for this basic implementation.
+
 ## Files
 
 - `model.py` — `Generator` and `Discriminator` classes.

@@ -60,6 +60,22 @@ def parse_args():
         default=1,
         help="save a sample image grid every N epochs (default: every epoch)",
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="load existing generator.pt/discriminator.pt from --out-dir before training, instead of starting fresh",
+    )
+    parser.add_argument(
+        "--label-smoothing",
+        type=float,
+        default=0.9,
+        help=(
+            "target label for real images when training the discriminator "
+            "(1.0 = no smoothing). Using slightly less than 1.0 keeps the "
+            "discriminator from getting overconfident, which helps against "
+            "mode collapse. The generator's target stays a full 1.0 either way."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -70,6 +86,16 @@ def save_sample_grid(generator, latent_dim, device, path, n=25):
         gen_imgs = generator(z)
     generator.train()
     save_image(gen_imgs, path, nrow=5, normalize=True)
+
+
+def save_checkpoints(generator, discriminator, latent_dim, img_shape, out_dir):
+    """Saves both checkpoints. Called periodically (not just at the end) so a
+    killed/interrupted run still leaves a usable, up-to-date checkpoint."""
+    torch.save(
+        {"state_dict": generator.state_dict(), "latent_dim": latent_dim, "img_shape": img_shape},
+        out_dir / "generator.pt",
+    )
+    torch.save({"state_dict": discriminator.state_dict(), "img_shape": img_shape}, out_dir / "discriminator.pt")
 
 
 def main():
@@ -88,6 +114,16 @@ def main():
     generator = Generator(latent_dim=args.latent_dim, img_shape=img_shape).to(device)
     discriminator = Discriminator(img_shape=img_shape).to(device)
 
+    if args.resume:
+        gen_ckpt_path = args.out_dir / "generator.pt"
+        disc_ckpt_path = args.out_dir / "discriminator.pt"
+        if gen_ckpt_path.exists() and disc_ckpt_path.exists():
+            generator.load_state_dict(torch.load(gen_ckpt_path, map_location=device)["state_dict"])
+            discriminator.load_state_dict(torch.load(disc_ckpt_path, map_location=device)["state_dict"])
+            print(f"Resumed from checkpoints in {args.out_dir}")
+        else:
+            print(f"--resume was set but no checkpoint found in {args.out_dir}, starting fresh")
+
     adversarial_loss = nn.BCELoss()
     # betas=(0.5, 0.999) is the standard choice for GAN training (from the
     # original DCGAN paper) — the lower beta1 makes Adam react faster to the
@@ -105,8 +141,16 @@ def main():
             batch_size = imgs.size(0)
             real_imgs = imgs.to(device)
 
-            # Ground-truth labels: 1 = real, 0 = fake
+            # Ground-truth labels: 1 = real, 0 = fake.
+            # `valid` (a full 1.0) is what the generator tries to fool the
+            # discriminator into predicting. `valid_smooth` is what the
+            # discriminator is actually trained to predict for real images —
+            # slightly less than 1.0 (label smoothing), so it never gets too
+            # confident. An overconfident discriminator is a common cause of
+            # mode collapse, since it gives the generator a less useful
+            # gradient to learn from.
             valid = torch.ones(batch_size, 1, device=device)
+            valid_smooth = torch.full((batch_size, 1), args.label_smoothing, device=device)
             fake = torch.zeros(batch_size, 1, device=device)
 
             # -----------------
@@ -131,7 +175,7 @@ def main():
             # here so this step doesn't also backprop into the generator.
             optimizer_D.zero_grad()
 
-            real_loss = adversarial_loss(discriminator(real_imgs), valid)
+            real_loss = adversarial_loss(discriminator(real_imgs), valid_smooth)
             fake_loss = adversarial_loss(discriminator(gen_imgs.detach()), fake)
             d_loss = (real_loss + fake_loss) / 2
             d_loss.backward()
@@ -143,30 +187,21 @@ def main():
 
         avg_g_loss = g_loss_total / max(n_batches, 1)
         avg_d_loss = d_loss_total / max(n_batches, 1)
-        print(f"[Epoch {epoch + 1}/{args.epochs}] D loss: {avg_d_loss:.4f}  G loss: {avg_g_loss:.4f}")
+        print(f"[Epoch {epoch + 1}/{args.epochs}] D loss: {avg_d_loss:.4f}  G loss: {avg_g_loss:.4f}", flush=True)
 
         if (epoch + 1) % args.sample_every == 0 or epoch == args.epochs - 1:
             sample_path = args.results_dir / f"epoch_{epoch + 1:03d}.png"
             save_sample_grid(generator, args.latent_dim, device, sample_path)
+            # Save checkpoints at the same cadence as samples, so an
+            # interrupted run still leaves a usable, fairly-recent checkpoint
+            # instead of nothing.
+            save_checkpoints(generator, discriminator, args.latent_dim, img_shape, args.out_dir)
+            print(f"Saved checkpoints to {args.out_dir} (after epoch {epoch + 1})", flush=True)
 
-    # Final sample grid + checkpoints
+    # Final sample grid + checkpoints (redundant with the last periodic save
+    # above if epochs is a multiple of sample_every, but cheap and safe)
     save_sample_grid(generator, args.latent_dim, device, args.results_dir / "final_samples.png")
-
-    torch.save(
-        {
-            "state_dict": generator.state_dict(),
-            "latent_dim": args.latent_dim,
-            "img_shape": img_shape,
-        },
-        args.out_dir / "generator.pt",
-    )
-    torch.save(
-        {
-            "state_dict": discriminator.state_dict(),
-            "img_shape": img_shape,
-        },
-        args.out_dir / "discriminator.pt",
-    )
+    save_checkpoints(generator, discriminator, args.latent_dim, img_shape, args.out_dir)
     print(f"Saved checkpoints to {args.out_dir}")
     print(f"Saved sample images to {args.results_dir}")
 
