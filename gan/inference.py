@@ -21,7 +21,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from gan.model import Generator
+from gan.model import DCGenerator, Generator
 
 try:
     from PIL import Image
@@ -30,19 +30,25 @@ except ImportError as e:  # pragma: no cover
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_CHECKPOINT = ROOT_DIR / "models" / "gan" / "generator.pt"
+DCGAN_CHECKPOINT = ROOT_DIR / "models" / "gan" / "generator_dcgan.pt"
 
 DISPLAY_SIZE = 128  # upscale generated images for easier viewing in the UI
 
 
-def load_generator(checkpoint_path: Path | str, device: str | None = None) -> Generator:
-    """Load a trained Generator from a checkpoint saved by gan/train.py."""
+def load_generator(checkpoint_path: Path | str, device: str | None = None) -> Generator | DCGenerator:
+    """Load a trained Generator (or DCGenerator) from a checkpoint saved by
+    gan/train.py. The checkpoint records which architecture it is, so the
+    right class gets rebuilt automatically — older checkpoints saved before
+    this field existed are assumed to be the original MLP architecture."""
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
     checkpoint_path = Path(checkpoint_path)
     checkpoint = torch.load(checkpoint_path, map_location=device)
 
-    model = Generator(
+    architecture = checkpoint.get("architecture", "mlp")
+    model_cls = DCGenerator if architecture == "dcgan" else Generator
+    model = model_cls(
         latent_dim=checkpoint["latent_dim"],
         img_shape=tuple(checkpoint["img_shape"]),
     )

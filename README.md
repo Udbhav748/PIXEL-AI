@@ -89,7 +89,8 @@ background.
 
 ```bash
 python vae/train.py --epochs 15
-python gan/train.py --epochs 30
+python gan/train.py --epochs 30                        # MLP GAN (basic)
+python gan/train.py --architecture dcgan --epochs 25    # DCGAN (conv, sharper/more varied — see gan/README.md)
 ```
 
 Both scripts run on CPU or GPU automatically (`cuda` if available, else
@@ -138,10 +139,12 @@ These are the exact resources provided for this assignment:
   rather than pretending otherwise.
 - Both are deliberately simple architectures (a small conv VAE, an MLP GAN)
   chosen for readability over state-of-the-art image quality.
-- The GAN shows mode collapse (generated digits cluster around a couple of
-  shapes rather than covering all 10). We tried training longer and label
-  smoothing — label smoothing fixed training stability but not diversity.
-  See `gan/README.md` → Experiments & findings for the full write-up of
-  what was tried and why it didn't fully fix it.
+- The original basic (MLP) GAN showed mode collapse and speckled/noisy
+  samples. Training longer made it worse; label smoothing fixed the
+  training-stability symptom but not diversity or sharpness. Switching to
+  a small conv-based DCGAN (kept alongside the MLP version, selectable in
+  the app's GAN tab) fixed both — smoother samples and noticeably more
+  digit variety. See `gan/README.md` → Experiments & findings for the
+  full write-up and the underlying reasoning.
 - OIDN is tuned for ray-traced renders, not general photography — results
   on real-world noisy photos can be inconsistent.

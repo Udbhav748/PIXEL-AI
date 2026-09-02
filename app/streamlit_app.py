@@ -14,7 +14,10 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT_DIR))
 
 VAE_CHECKPOINT = ROOT_DIR / "models" / "vae" / "vae.pt"
-GAN_CHECKPOINT = ROOT_DIR / "models" / "gan" / "generator.pt"
+GAN_CHECKPOINTS = {
+    "MLP (basic)": ROOT_DIR / "models" / "gan" / "generator.pt",
+    "DCGAN (conv)": ROOT_DIR / "models" / "gan" / "generator_dcgan.pt",
+}
 
 st.set_page_config(page_title="Image AI Lab", layout="wide")
 st.title("Image AI Lab")
@@ -173,15 +176,25 @@ with tab_gan:
     st.subheader("GAN generation")
     st.write("Generates new images from random noise. There's no input image here — that's the point of a GAN.")
 
-    if not GAN_CHECKPOINT.exists():
+    architecture = st.radio(
+        "Architecture",
+        list(GAN_CHECKPOINTS.keys()),
+        horizontal=True,
+        key="gan_architecture",
+        help="MLP is the original basic GAN. DCGAN (conv-based) gives smoother, less speckled samples and less mode collapse — see gan/README.md for the comparison.",
+    )
+    gan_checkpoint = GAN_CHECKPOINTS[architecture]
+
+    if not gan_checkpoint.exists():
+        train_cmd = "python gan/train.py" if architecture == "MLP (basic)" else "python gan/train.py --architecture dcgan"
         st.warning(
-            "No trained GAN checkpoint found. Train one first with:\n\n"
-            "```\npython gan/train.py\n```"
+            f"No trained checkpoint found for {architecture}. Train one first with:\n\n"
+            f"```\n{train_cmd}\n```"
         )
     else:
         try:
             from gan.inference import load_generator, generate as gan_generate
-            gan_model = load_generator(GAN_CHECKPOINT)
+            gan_model = load_generator(gan_checkpoint)
             gan_load_error = None
         except Exception as exc:
             gan_model = None
@@ -195,6 +208,6 @@ with tab_gan:
                 with st.spinner("Generating..."):
                     try:
                         samples = gan_generate(gan_model, n_images)
-                        st.image(samples, caption=["GAN sample"] * len(samples))
+                        st.image(samples, caption=[f"{architecture} sample"] * len(samples))
                     except Exception as exc:
                         st.error(f"Generation failed: {exc}")

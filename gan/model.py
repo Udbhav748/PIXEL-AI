@@ -70,3 +70,76 @@ class Discriminator(nn.Module):
         img_flat = img.view(img.size(0), -1)
         validity = self.model(img_flat)
         return validity
+
+
+# ---------------------------------------------------------------------------
+# DCGAN variant: same idea (generator vs. discriminator, adversarial BCE
+# loss), but using convolutions instead of fully-connected layers.
+#
+# Why this looks cleaner: a Linear layer treats every pixel as an independent
+# number, so an MLP generator has no built-in notion that "neighboring pixels
+# tend to look similar." A Conv/ConvTranspose layer does, by construction —
+# it slides the same small filter across the image, so nearby output pixels
+# share the same local computation. That's why DCGAN samples usually come out
+# smoother and less speckled than plain MLP-GAN samples, even at the same
+# training length.
+# ---------------------------------------------------------------------------
+
+
+class DCGenerator(nn.Module):
+    """Conv-based generator: latent vector -> 7x7 feature map -> upsample to 28x28."""
+
+    def __init__(self, latent_dim: int = 100, img_shape: tuple = (1, 28, 28)):
+        super().__init__()
+        self.latent_dim = latent_dim
+        self.img_shape = img_shape
+        channels = img_shape[0]
+
+        # Project the latent vector into a small 128-channel, 7x7 feature map.
+        self.project = nn.Linear(latent_dim, 128 * 7 * 7)
+
+        self.conv_blocks = nn.Sequential(
+            nn.BatchNorm2d(128),
+            # 7x7 -> 14x14
+            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            # 14x14 -> 28x28
+            nn.ConvTranspose2d(64, channels, kernel_size=4, stride=2, padding=1),
+            nn.Tanh(),  # squashes output to [-1, 1], matching the MLP generator
+        )
+
+    def forward(self, z: torch.Tensor) -> torch.Tensor:
+        out = self.project(z)
+        out = out.view(out.size(0), 128, 7, 7)
+        img = self.conv_blocks(out)
+        return img
+
+
+class DCDiscriminator(nn.Module):
+    """Conv-based discriminator: 28x28 image -> downsample to 7x7 -> real/fake probability."""
+
+    def __init__(self, img_shape: tuple = (1, 28, 28)):
+        super().__init__()
+        self.img_shape = img_shape
+        channels = img_shape[0]
+
+        self.conv_blocks = nn.Sequential(
+            # 28x28 -> 14x14
+            nn.Conv2d(channels, 64, kernel_size=4, stride=2, padding=1),
+            nn.LeakyReLU(0.2, inplace=True),
+            # 14x14 -> 7x7
+            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(0.2, inplace=True),
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(128 * 7 * 7, 1),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, img: torch.Tensor) -> torch.Tensor:
+        features = self.conv_blocks(img)
+        features = features.view(features.size(0), -1)
+        validity = self.classifier(features)
+        return validity

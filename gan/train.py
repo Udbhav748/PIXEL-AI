@@ -30,7 +30,7 @@ from torchvision.utils import save_image
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from gan.dataset import get_dataloader
-from gan.model import Discriminator, Generator
+from gan.model import DCDiscriminator, DCGenerator, Discriminator, Generator
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DATA_DIR = ROOT_DIR / "data"
@@ -45,6 +45,19 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--latent-dim", type=int, default=100)
     parser.add_argument("--dataset", type=str, default="mnist", choices=["mnist", "fashion-mnist"])
+    parser.add_argument(
+        "--architecture",
+        type=str,
+        default="mlp",
+        choices=["mlp", "dcgan"],
+        help=(
+            "'mlp' = the original fully-connected generator/discriminator. "
+            "'dcgan' = a small conv-based generator/discriminator, usually gives "
+            "smoother/less speckled samples. Checkpoints are saved to separate "
+            "files (generator.pt vs generator_dcgan.pt) so training one doesn't "
+            "overwrite the other."
+        ),
+    )
     parser.add_argument(
         "--max-batches",
         type=int,
@@ -88,14 +101,33 @@ def save_sample_grid(generator, latent_dim, device, path, n=25):
     save_image(gen_imgs, path, nrow=5, normalize=True)
 
 
-def save_checkpoints(generator, discriminator, latent_dim, img_shape, out_dir):
+def checkpoint_filenames(architecture: str) -> tuple[str, str]:
+    """generator.pt/discriminator.pt for the mlp architecture (kept as the
+    original, default names for backwards compatibility), generator_dcgan.pt/
+    discriminator_dcgan.pt for the dcgan variant, so training one doesn't
+    overwrite the other."""
+    if architecture == "mlp":
+        return "generator.pt", "discriminator.pt"
+    return f"generator_{architecture}.pt", f"discriminator_{architecture}.pt"
+
+
+def save_checkpoints(generator, discriminator, latent_dim, img_shape, architecture, out_dir):
     """Saves both checkpoints. Called periodically (not just at the end) so a
     killed/interrupted run still leaves a usable, up-to-date checkpoint."""
+    gen_name, disc_name = checkpoint_filenames(architecture)
     torch.save(
-        {"state_dict": generator.state_dict(), "latent_dim": latent_dim, "img_shape": img_shape},
-        out_dir / "generator.pt",
+        {
+            "state_dict": generator.state_dict(),
+            "latent_dim": latent_dim,
+            "img_shape": img_shape,
+            "architecture": architecture,
+        },
+        out_dir / gen_name,
     )
-    torch.save({"state_dict": discriminator.state_dict(), "img_shape": img_shape}, out_dir / "discriminator.pt")
+    torch.save(
+        {"state_dict": discriminator.state_dict(), "img_shape": img_shape, "architecture": architecture},
+        out_dir / disc_name,
+    )
 
 
 def main():
@@ -111,12 +143,18 @@ def main():
         batch_size=args.batch_size, dataset_name=args.dataset, data_dir=args.data_dir
     )
 
-    generator = Generator(latent_dim=args.latent_dim, img_shape=img_shape).to(device)
-    discriminator = Discriminator(img_shape=img_shape).to(device)
+    if args.architecture == "dcgan":
+        generator = DCGenerator(latent_dim=args.latent_dim, img_shape=img_shape).to(device)
+        discriminator = DCDiscriminator(img_shape=img_shape).to(device)
+    else:
+        generator = Generator(latent_dim=args.latent_dim, img_shape=img_shape).to(device)
+        discriminator = Discriminator(img_shape=img_shape).to(device)
+
+    gen_name, disc_name = checkpoint_filenames(args.architecture)
 
     if args.resume:
-        gen_ckpt_path = args.out_dir / "generator.pt"
-        disc_ckpt_path = args.out_dir / "discriminator.pt"
+        gen_ckpt_path = args.out_dir / gen_name
+        disc_ckpt_path = args.out_dir / disc_name
         if gen_ckpt_path.exists() and disc_ckpt_path.exists():
             generator.load_state_dict(torch.load(gen_ckpt_path, map_location=device)["state_dict"])
             discriminator.load_state_dict(torch.load(disc_ckpt_path, map_location=device)["state_dict"])
@@ -190,18 +228,19 @@ def main():
         print(f"[Epoch {epoch + 1}/{args.epochs}] D loss: {avg_d_loss:.4f}  G loss: {avg_g_loss:.4f}", flush=True)
 
         if (epoch + 1) % args.sample_every == 0 or epoch == args.epochs - 1:
-            sample_path = args.results_dir / f"epoch_{epoch + 1:03d}.png"
-            save_sample_grid(generator, args.latent_dim, device, sample_path)
+            sample_name = f"epoch_{epoch + 1:03d}.png" if args.architecture == "mlp" else f"epoch_{epoch + 1:03d}_{args.architecture}.png"
+            save_sample_grid(generator, args.latent_dim, device, args.results_dir / sample_name)
             # Save checkpoints at the same cadence as samples, so an
             # interrupted run still leaves a usable, fairly-recent checkpoint
             # instead of nothing.
-            save_checkpoints(generator, discriminator, args.latent_dim, img_shape, args.out_dir)
+            save_checkpoints(generator, discriminator, args.latent_dim, img_shape, args.architecture, args.out_dir)
             print(f"Saved checkpoints to {args.out_dir} (after epoch {epoch + 1})", flush=True)
 
     # Final sample grid + checkpoints (redundant with the last periodic save
     # above if epochs is a multiple of sample_every, but cheap and safe)
-    save_sample_grid(generator, args.latent_dim, device, args.results_dir / "final_samples.png")
-    save_checkpoints(generator, discriminator, args.latent_dim, img_shape, args.out_dir)
+    final_name = "final_samples.png" if args.architecture == "mlp" else f"final_samples_{args.architecture}.png"
+    save_sample_grid(generator, args.latent_dim, device, args.results_dir / final_name)
+    save_checkpoints(generator, discriminator, args.latent_dim, img_shape, args.architecture, args.out_dir)
     print(f"Saved checkpoints to {args.out_dir}")
     print(f"Saved sample images to {args.results_dir}")
 
