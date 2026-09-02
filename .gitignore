@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Data / large artifacts
+data/*
+!data/.gitkeep
+
+# Model checkpoints: the trained VAE/GAN checkpoints here are small (a few MB)
+# and are kept in the repo so the app works right after a clone. If you retrain
+# with a bigger architecture and checkpoints grow large, re-add an ignore rule
+# here — see models/*/README.md.
+
+# Streamlit / logs
+*.log
+.streamlit/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
