@@ -32,9 +32,23 @@ Unlike normal supervised training, you don't want either loss to just steadily d
 
 This project uses the simplest possible GAN (MLP layers only, no convolutions) to keep the architecture easy to follow. It's more prone to instability and mode collapse than fancier variants (DCGAN, WGAN, etc.), but that's a fair tradeoff for a first GAN implementation.
 
-**Label smoothing:** training the discriminator on real images target `0.9` instead of a full `1.0` (`--label-smoothing`, default `0.9`) keeps it from getting overconfident too early — an overconfident discriminator gives the generator a weak, uninformative gradient, which is one of the things that pushes a GAN toward mode collapse. We tried just training longer first (75 epochs vs. 25) and it didn't help — the discriminator only got stronger, not weaker — so label smoothing was added instead.
+## Experiments & findings
 
-**Result:** label smoothing did what it's supposed to do — D loss and G loss both plateaued instead of drifting further apart (D loss stayed around 0.27-0.30 instead of dropping to 0.13 like the un-smoothed 75-epoch run). But sample diversity didn't meaningfully improve — generated digits still cluster around a few shapes. That's a useful, honest result for a course project: it shows label smoothing fixes the *training stability* symptom, but mode collapse in a plain MLP GAN is a deeper architectural limitation that needs a structurally different fix (minibatch discrimination, a conv-based DCGAN, or similar) — out of scope for this basic implementation.
+We ran into mode collapse — generated digits clustering around a couple of repeated shapes instead of covering all 10 — and tried two things to address it.
+
+| Attempt | Setup | D loss (final) | G loss (final) | Sample diversity |
+|---|---|---|---|---|
+| 1. Baseline | 25 epochs, no label smoothing | ~0.21 | ~2.8 | Low — mostly 2s and 3s |
+| 2. Train longer | 75 epochs, no label smoothing | 0.13 (still falling) | 3.8 (still rising) | Still low — discriminator just kept overpowering the generator |
+| 3. Label smoothing | ~25 epochs, real-label target 0.9 instead of 1.0 | 0.28-0.30 (plateaued) | 2.8-2.9 (plateaued) | Still low — similar clustering to attempt 1 |
+
+**Attempt 1 → 2 (train longer):** made things worse, not better. The discriminator kept getting stronger the whole time (D loss trending toward 0), meaning the generator's feedback signal kept getting weaker. More epochs alone doesn't fix mode collapse in a GAN — sometimes it entrenches it, since the imbalance has more time to run away.
+
+**Attempt 2 → 3 (label smoothing):** trained the discriminator to predict `0.9` instead of a full `1.0` for real images (`--label-smoothing`, default `0.9`), so it can't get overconfident. This worked exactly as intended — both losses stopped drifting and settled into a stable range instead. But sample diversity barely changed.
+
+**Diagnosis:** label smoothing fixes *training stability* (an overconfident discriminator), which is a real problem, but it isn't the same problem as mode collapse (the generator settling for a narrow set of outputs). They often show up together, which makes it tempting to assume one fix handles both — this project's result shows that isn't guaranteed. Actually fixing the diversity problem would need something that directly penalizes the generator for producing similar outputs within a batch (minibatch discrimination, feature matching) or a fundamentally better-suited architecture (a convolutional DCGAN instead of this MLP GAN). Both are reasonable next steps but out of scope for a first "basic GAN" implementation — noted here rather than silently left out.
+
+The pre-label-smoothing checkpoint (attempt 1, 25 epochs) is kept at `models/gan/backup_25ep/` for comparison, alongside the current label-smoothed one at `models/gan/generator.pt`.
 
 ## Files
 

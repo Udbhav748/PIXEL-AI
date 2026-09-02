@@ -138,5 +138,10 @@ These are the exact resources provided for this assignment:
   rather than pretending otherwise.
 - Both are deliberately simple architectures (a small conv VAE, an MLP GAN)
   chosen for readability over state-of-the-art image quality.
+- The GAN shows mode collapse (generated digits cluster around a couple of
+  shapes rather than covering all 10). We tried training longer and label
+  smoothing — label smoothing fixed training stability but not diversity.
+  See `gan/README.md` → Experiments & findings for the full write-up of
+  what was tried and why it didn't fully fix it.
 - OIDN is tuned for ray-traced renders, not general photography — results
   on real-world noisy photos can be inconsistent.
