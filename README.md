@@ -121,8 +121,16 @@ runs before committing to a full training run.
 
 All images below are produced by actually running the project's notebooks
 (`notebooks/01_OIDN.ipynb`, `02_VAE.ipynb`, `03_GAN.ipynb`) against the real
-trained checkpoints — not hand-picked screenshots. Re-running any notebook
-regenerates the exact same files.
+trained checkpoints — not hand-picked or externally generated images.
+Re-running any notebook regenerates the exact same files.
+
+**Proof, not just a claim:** `notebooks/execution_screenshots/` has actual
+screenshots of these notebooks open and executed — code cells, their
+execution order (`In [3]`, `In [11]`, ...), and the real printed output
+sitting right next to the `matplotlib` code that produced it:
+[OIDN](notebooks/execution_screenshots/01_OIDN_execution.png) ·
+[VAE](notebooks/execution_screenshots/02_VAE_execution.png) ·
+[GAN](notebooks/execution_screenshots/03_GAN_execution.png).
 
 ### OIDN
 
