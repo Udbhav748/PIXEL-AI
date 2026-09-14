@@ -126,6 +126,12 @@ need a trained checkpoint first — see Training below. If a checkpoint is
 missing, the app tells you so rather than training silently in the
 background.
 
+**Screenshots:**
+
+<img src="app/screenshots/oidn_tab.png" width="360" alt="OIDN tab screenshot">
+<img src="app/screenshots/vae_tab.png" width="360" alt="VAE tab screenshot">
+<img src="app/screenshots/gan_tab.png" width="360" alt="GAN tab screenshot">
+
 ## Training
 
 ```bash
