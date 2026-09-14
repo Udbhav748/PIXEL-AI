@@ -36,12 +36,15 @@ This project uses the simplest possible GAN (MLP layers only, no convolutions) t
 
 We ran into mode collapse — generated digits clustering around a couple of repeated shapes instead of covering all 10 — and tried two things to address it.
 
-| Attempt | Setup | D loss (final) | G loss (final) | Sample diversity | Sample sharpness |
-|---|---|---|---|---|---|
-| 1. Baseline | MLP, 25 epochs, no label smoothing | ~0.21 | ~2.8 | Low — mostly 2s and 3s | Speckled/noisy |
-| 2. Train longer | MLP, 75 epochs, no label smoothing | 0.13 (still falling) | 3.8 (still rising) | Still low | Still speckled |
-| 3. Label smoothing | MLP, ~25 epochs, real-label target 0.9 | 0.28-0.30 (plateaued) | 2.8-2.9 (plateaued) | Still low, similar to attempt 1 | Still speckled |
-| 4. DCGAN | Conv G/D, 25 epochs, label smoothing kept | 0.25-0.30 (stable) | 2.6-3.3 (stable) | **Clearly better** — 0/2/3/5/7/8/9-like shapes visible in one grid | **Clearly better** — smooth strokes, no speckle noise |
+| Attempt | Setup | D loss (final) | G loss (final) | Classifier confidence | Classes seen (/10) | Discriminator AUC |
+|---|---|---|---|---|---|---|
+| 1. Baseline | MLP, 25 epochs, no label smoothing | ~0.21 | ~2.8 | — | mostly 2s/3s | — |
+| 2. Train longer | MLP, 75 epochs, no label smoothing | 0.13 (still falling) | 3.8 (still rising) | — | still low | — |
+| 3. Label smoothing | MLP, ~25 epochs, real-label target 0.9 | 0.28-0.30 (plateaued) | 2.8-2.9 (plateaued) | 66.7% | 6/10 | 0.996 |
+| 4. DCGAN | Conv G/D, 25 epochs, label smoothing kept | 0.25-0.30 (stable) | 2.6-3.3 (stable) | 81.9% | 10/10 | 0.944 |
+| 5. GPU + weight init + TTUR | Both architectures, 150 epochs on a Kaggle GPU, DCGAN-paper weight init, `--lr-d 1e-4` (TTUR) | MLP: 0.30, DCGAN: 0.32 | MLP: 2.69, DCGAN: 2.50 | MLP: **73.8%**, DCGAN: **82.3%** | MLP: **7/10**, DCGAN: **10/10** | MLP: **0.982**, DCGAN: **0.981** |
+
+(Attempts 1-4 were CPU-trained. Attempt 5 quantitative columns were empty for 1-2 since those predate adding the classifier-based evaluation.)
 
 **Attempt 1 → 2 (train longer):** made things worse, not better. The discriminator kept getting stronger the whole time (D loss trending toward 0), meaning the generator's feedback signal kept getting weaker. More epochs alone doesn't fix mode collapse in a GAN — sometimes it entrenches it, since the imbalance has more time to run away.
 
@@ -49,9 +52,13 @@ We ran into mode collapse — generated digits clustering around a couple of rep
 
 **Attempt 3 → 4 (DCGAN — swap MLP layers for convolutions):** kept label smoothing, but replaced both the generator and discriminator with small conv-based networks (`DCGenerator`/`DCDiscriminator` in `model.py` — see the "DCGAN variant" comment block there for why convolutions help). This is the one that actually delivered: noticeably smoother strokes (a direct result of convolution's built-in spatial locality) *and* noticeably more varied digit shapes in the same 25-epoch budget, even though nothing about the loss function or training length changed from attempt 3. It's not perfect — this is still a small, quickly-trained model, not a polished generator — but it's a clear, visible step up.
 
-**Diagnosis:** this project ended up separating two failure modes that are easy to conflate. *Training instability* (an overconfident discriminator, diverging losses) is a loss-function/hyperparameter problem — label smoothing fixed it directly. *Mode collapse and blurriness* (limited output variety, speckled pixels) turned out to be closer to an *architecture* problem — the MLP's lack of spatial structure — and switching to convolutions fixed both symptoms together, better than any loss-side tweak did on its own.
+**Attempt 4 → 5 (GPU + weight init + TTUR + 150 epochs, both architectures):** once quantitative evaluation existed (classifier confidence, class coverage, ROC/AUC — added after attempt 4), it became possible to properly retrain *both* architectures with more standard GAN stabilizers layered on: DCGAN-paper weight initialization (`weights_init()` in `train.py`) and TTUR (a lower discriminator learning rate, `--lr-d`, so it doesn't outpace the generator — see the `--lr-d` help text in `train.py`), for 150 epochs each on a Kaggle GPU instead of CPU (see `kaggle/`).
 
-Checkpoints for all the meaningfully different attempts are kept for comparison: `models/gan/backup_25ep/` (attempt 1, no label smoothing), `models/gan/generator.pt` (attempt 3, MLP + label smoothing — also the "MLP (basic)" option in the Streamlit app), and `models/gan/generator_dcgan.pt` (attempt 4, DCGAN — the "DCGAN (conv)" option in the app). Pick either one in the GAN tab to compare them side by side.
+This closed most of the *training*-side gap: the MLP's discriminator AUC dropped from 0.996 to 0.982 (nearly tied with DCGAN's 0.981) and its classifier confidence rose from 66.7% to 73.8% — a real improvement from training technique alone, on the *same* MLP architecture. But it did **not** close the *diversity* gap: MLP went from 6/10 to 7/10 classes, still missing 3; the DCGAN reached 10/10 under the identical recipe. This is a cleaner result than attempt 4 alone gave us — it isolates training technique and architecture as two separate levers, rather than crediting the DCGAN swap for everything.
+
+**Diagnosis:** this project ended up separating two failure modes that are easy to conflate. *Training instability* (an overconfident discriminator, diverging losses, low classifier confidence) is a training-technique problem — label smoothing, weight init, and TTUR all target it, and together they closed almost all of the MLP-vs-DCGAN AUC gap. *Mode collapse specifically* (missing digit classes) turned out to be more of an *architecture* problem — the MLP still missed 3/10 classes even after the same training improvements that helped its confidence and AUC. Convolutions still won on diversity specifically, even once training itself was no longer the bottleneck.
+
+Checkpoints for the meaningfully different attempts are kept for comparison: `models/gan/backup_25ep/` (attempt 1, CPU, no label smoothing), `models/gan/generator.pt` (attempt 5, MLP — the current "MLP (basic)" option in the Streamlit app), and `models/gan/generator_dcgan.pt` (attempt 5, DCGAN — the current "DCGAN (conv)" option in the app). Pick either one in the GAN tab to compare them side by side.
 
 ## Files
 
