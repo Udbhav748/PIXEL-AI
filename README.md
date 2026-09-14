@@ -124,20 +124,6 @@ All images below are produced by actually running the project's notebooks
 trained checkpoints — not hand-picked or externally generated images.
 Re-running any notebook regenerates the exact same files.
 
-**Proof, not just a claim:** screenshots of these notebooks actually open and
-executed — code cells, their execution order (`In [3]`, `In [11]`, ...), and
-the real printed output sitting right next to the `matplotlib` code that
-produced it.
-
-**OIDN notebook, executed:**
-![OIDN notebook execution](notebooks/execution_screenshots/01_OIDN_execution.png)
-
-**VAE notebook, executed:**
-![VAE notebook execution](notebooks/execution_screenshots/02_VAE_execution.png)
-
-**GAN notebook, executed:**
-![GAN notebook execution](notebooks/execution_screenshots/03_GAN_execution.png)
-
 ### OIDN
 
 Noisy input vs. OIDN's denoised output:
