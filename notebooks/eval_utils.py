@@ -8,6 +8,7 @@ the model's output as a real, correct digit.
 
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -82,3 +83,33 @@ def predict(model, images, device):
         probs = F.softmax(model(images.to(device)), dim=1)
         conf, preds = probs.max(dim=1)
     return preds.cpu(), conf.cpu()
+
+
+def roc_curve(scores, labels):
+    """A plain numpy ROC curve -- no sklearn dependency, just the definition:
+    sweep every possible threshold on `scores`, and at each one compute the
+    true-positive rate and false-positive rate against `labels` (1 = positive
+    class, 0 = negative). Returns (fpr, tpr, auc), each sorted by ascending
+    fpr so the curve plots correctly and the AUC is a plain trapezoidal
+    integral under it."""
+    scores = np.asarray(scores, dtype=np.float64)
+    labels = np.asarray(labels, dtype=np.int64)
+
+    n_pos = (labels == 1).sum()
+    n_neg = (labels == 0).sum()
+
+    # Thresholds: every observed score, highest first, plus one above the max
+    # so the curve starts at (0, 0).
+    thresholds = np.concatenate([[scores.max() + 1e-6], np.sort(scores)[::-1]])
+
+    tpr = np.empty(len(thresholds))
+    fpr = np.empty(len(thresholds))
+    for i, t in enumerate(thresholds):
+        predicted_positive = scores >= t
+        tp = np.logical_and(predicted_positive, labels == 1).sum()
+        fp = np.logical_and(predicted_positive, labels == 0).sum()
+        tpr[i] = tp / n_pos if n_pos else 0.0
+        fpr[i] = fp / n_neg if n_neg else 0.0
+
+    auc = np.trapz(tpr, fpr)
+    return fpr, tpr, auc

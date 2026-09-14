@@ -193,6 +193,26 @@ The MLP GAN never produces anything the classifier recognizes as a 0, 1, 4,
 or 6 — direct numeric evidence of the mode collapse discussed below. The
 DCGAN covers all 10 digits with meaningfully higher confidence.
 
+**ROC curve** — the discriminator's actual job is a binary classifier (real
+vs. fake), so this is a direct fit, not a stretch: real MNIST test images
+labeled 1, this generator's own freshly-generated fakes labeled 0, sweeping
+every threshold on the discriminator's output score.
+
+![GAN discriminator ROC curve](results/gan/roc_curve.png)
+
+| | Discriminator AUC |
+|---|---|
+| MLP (basic) | 0.996 |
+| DCGAN (conv) | 0.944 |
+
+Read this one the other way round from the table above: **closer to 1.0 is
+worse for the generator here.** The MLP's discriminator can almost perfectly
+tell its generator's fakes apart from real digits (AUC 0.996) — the fakes
+just aren't convincing. The DCGAN's discriminator has a harder time (AUC
+0.944), meaning the DCGAN generator produces images that more often pass as
+real. Same conclusion as the class-distribution result above, from the
+opposite side of the adversarial game.
+
 See `gan/README.md` → Experiments & findings for the full story behind that
 comparison (train longer → label smoothing → DCGAN), and
 `results/gan/epoch_XXX*.png` for samples across training.
@@ -203,7 +223,7 @@ comparison (train longer → label smoothing → DCGAN), and
 |-------|------------------------------|-------------------------|-------------------------------------|----------------------|
 | OIDN  | Denoising                    | Noisy image             | Clean image                         | +6.45 dB PSNR vs. clean reference |
 | VAE   | Reconstruction / generation  | Image / latent vector   | Reconstruction / generated image    | 95.2% digit identity preserved (vs. 97.6% baseline) |
-| GAN   | Generation                   | Random noise            | Synthetic image                     | DCGAN: 10/10 digit classes, 81.9% confidence (MLP: 6/10, 66.7%) |
+| GAN   | Generation                   | Random noise            | Synthetic image                     | DCGAN: 10/10 digit classes, 81.9% confidence, discriminator AUC 0.944 (MLP: 6/10, 66.7%, AUC 0.996) |
 
 ## Future experiments
 
