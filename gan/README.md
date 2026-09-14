@@ -67,7 +67,11 @@ python gan/train.py --epochs 30                          # MLP (basic), the defa
 python gan/train.py --architecture dcgan --epochs 25      # DCGAN (conv)
 ```
 
-Useful flags: `--architecture {mlp,dcgan}`, `--epochs`, `--batch-size`, `--lr`, `--latent-dim`, `--dataset {mnist,fashion-mnist}`, `--label-smoothing` (default `0.9`), `--max-batches` (cap batches/epoch, handy for a quick test run), `--data-dir`, `--out-dir`, `--results-dir`, `--sample-every`, `--resume` (continue from the existing checkpoint for the chosen architecture instead of starting fresh — handy if a long run gets interrupted, since checkpoints are also saved periodically during training, not just at the end).
+Useful flags: `--architecture {mlp,dcgan}`, `--epochs`, `--batch-size`, `--lr` (generator learning rate), `--lr-d` (discriminator learning rate, defaults to `--lr` if not set — see TTUR note below), `--latent-dim`, `--dataset {mnist,fashion-mnist}`, `--label-smoothing` (default `0.9`), `--max-batches` (cap batches/epoch, handy for a quick test run), `--data-dir`, `--out-dir`, `--results-dir`, `--sample-every`, `--resume` (continue from the existing checkpoint for the chosen architecture instead of starting fresh — handy if a long run gets interrupted, since checkpoints are also saved periodically during training, not just at the end).
+
+**Weight initialization:** both architectures now get the standard DCGAN-paper init (`weights_init()` in `train.py`) — conv/linear weights from a tight `N(0, 0.02)` instead of PyTorch's wider default, BatchNorm scale from `N(1, 0.02)`. Applied automatically on a fresh run (skipped when `--resume` actually finds a checkpoint, since then you want the resumed weights, not a reset).
+
+**TTUR (`--lr-d`):** set the discriminator's learning rate lower than the generator's (e.g. `--lr 2e-4 --lr-d 1e-4`) to slow it down relative to the generator — directly targets the same "discriminator overpowers the generator" problem label smoothing partially addressed, from the optimizer side instead of the loss side. See `kaggle/` for a GPU training setup that uses this.
 
 The two architectures save to separate files so training one never overwrites the other: `generator.pt`/`discriminator.pt` for MLP, `generator_dcgan.pt`/`discriminator_dcgan.pt` for DCGAN (same pattern for the `epoch_XXX*.png`/`final_samples*.png` result images).
 

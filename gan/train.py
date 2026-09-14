@@ -42,7 +42,19 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train a vanilla GAN on MNIST/Fashion-MNIST")
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--lr", type=float, default=2e-4)
+    parser.add_argument("--lr", type=float, default=2e-4, help="generator learning rate")
+    parser.add_argument(
+        "--lr-d",
+        type=float,
+        default=None,
+        help=(
+            "discriminator learning rate (default: same as --lr). Setting this lower than "
+            "--lr is a technique called TTUR (two-timescale update rule) -- it slows the "
+            "discriminator down relative to the generator, which helps if the discriminator "
+            "tends to overpower the generator (a common cause of weak gradients / mode "
+            "collapse). E.g. --lr 2e-4 --lr-d 1e-4."
+        ),
+    )
     parser.add_argument("--latent-dim", type=int, default=100)
     parser.add_argument("--dataset", type=str, default="mnist", choices=["mnist", "fashion-mnist"])
     parser.add_argument(
@@ -90,6 +102,25 @@ def parse_args():
         ),
     )
     return parser.parse_args()
+
+
+def weights_init(m):
+    """Standard DCGAN-paper weight initialization: conv/linear layers from a
+    tight N(0, 0.02) instead of PyTorch's wider default init, and BatchNorm
+    scale from N(1, 0.02) with bias 0. This alone tends to make GAN training
+    noticeably more stable -- applied to both architectures here since it's
+    cheap and doesn't change the model definitions, just their starting
+    point."""
+    classname = m.__class__.__name__
+    if classname.find("Conv") != -1:
+        nn.init.normal_(m.weight.data, 0.0, 0.02)
+    elif classname.find("BatchNorm") != -1:
+        nn.init.normal_(m.weight.data, 1.0, 0.02)
+        nn.init.constant_(m.bias.data, 0)
+    elif classname.find("Linear") != -1:
+        nn.init.normal_(m.weight.data, 0.0, 0.02)
+        if m.bias is not None:
+            nn.init.constant_(m.bias.data, 0)
 
 
 def save_sample_grid(generator, latent_dim, device, path, n=25):
@@ -161,13 +192,21 @@ def main():
             print(f"Resumed from checkpoints in {args.out_dir}")
         else:
             print(f"--resume was set but no checkpoint found in {args.out_dir}, starting fresh")
+            generator.apply(weights_init)
+            discriminator.apply(weights_init)
+    else:
+        generator.apply(weights_init)
+        discriminator.apply(weights_init)
+
+    lr_d = args.lr_d if args.lr_d is not None else args.lr
+    print(f"Generator lr: {args.lr}  Discriminator lr: {lr_d}")
 
     adversarial_loss = nn.BCELoss()
     # betas=(0.5, 0.999) is the standard choice for GAN training (from the
     # original DCGAN paper) — the lower beta1 makes Adam react faster to the
     # constantly-shifting adversarial objective than its usual default of 0.9.
     optimizer_G = torch.optim.Adam(generator.parameters(), lr=args.lr, betas=(0.5, 0.999))
-    optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=args.lr, betas=(0.5, 0.999))
+    optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr_d, betas=(0.5, 0.999))
 
     for epoch in range(args.epochs):
         g_loss_total, d_loss_total, n_batches = 0.0, 0.0, 0
