@@ -126,11 +126,22 @@ need a trained checkpoint first — see Training below. If a checkpoint is
 missing, the app tells you so rather than training silently in the
 background.
 
-**Screenshots:**
+**Screenshots** (each one is a real feature actually being used, not just a tab sitting idle):
 
-<img src="app/screenshots/oidn_tab.png" width="360" alt="OIDN tab screenshot">
-<img src="app/screenshots/vae_tab.png" width="360" alt="VAE tab screenshot">
-<img src="app/screenshots/gan_tab.png" width="360" alt="GAN tab screenshot">
+<table>
+<tr>
+<td width="50%"><img src="app/screenshots/oidn_tab.png" width="380" alt="OIDN tab: noisy image denoised"><br/><sub>OIDN — before/after denoising</sub></td>
+<td width="50%"><img src="app/screenshots/vae_reconstruct.png" width="380" alt="VAE tab: a real digit reconstructed"><br/><sub>VAE — reconstructing an uploaded digit</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="app/screenshots/vae_generate.png" width="380" alt="VAE tab: random samples generated"><br/><sub>VAE — generating from random latent vectors</sub></td>
+<td width="50%"><img src="app/screenshots/gan_mlp.png" width="380" alt="GAN tab: MLP architecture generating samples"><br/><sub>GAN — MLP (basic) architecture</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="app/screenshots/gan_dcgan.png" width="380" alt="GAN tab: DCGAN architecture generating samples"><br/><sub>GAN — DCGAN (conv) architecture</sub></td>
+<td width="50%"></td>
+</tr>
+</table>
 
 ## Training
 
