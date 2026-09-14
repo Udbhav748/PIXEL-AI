@@ -208,10 +208,12 @@ encoder and decoded back:
 | | Classifier accuracy |
 |---|---|
 | Original test images | 97.6% |
-| VAE reconstructions | 95.2% |
+| VAE reconstructions | 93.2% |
 
-Digit identity survives the full encode/decode round-trip with only a ~2.4
-point drop.
+Digit identity survives the full encode/decode round-trip with only a small
+drop. (This number moves a point or two between runs — the VAE's
+reparameterization step samples fresh random noise every forward pass, so
+reconstructions are genuinely stochastic, not cached.)
 
 *(training loss curve: `results/vae/loss_curve.png`)*
 
@@ -266,7 +268,7 @@ comparison (train longer → label smoothing → DCGAN), and
 | Model | Purpose                     | Input                  | Output                            | Quantitative result |
 |-------|------------------------------|-------------------------|-------------------------------------|----------------------|
 | OIDN  | Denoising                    | Noisy image             | Clean image                         | +6.45 dB PSNR vs. clean reference |
-| VAE   | Reconstruction / generation  | Image / latent vector   | Reconstruction / generated image    | 95.2% digit identity preserved (vs. 97.6% baseline) |
+| VAE   | Reconstruction / generation  | Image / latent vector   | Reconstruction / generated image    | ~93-95% digit identity preserved (vs. 97.6% baseline) |
 | GAN   | Generation                   | Random noise            | Synthetic image                     | DCGAN: 10/10 digit classes, 81.9% confidence, discriminator AUC 0.944 (MLP: 6/10, 66.7%, AUC 0.996) |
 
 ## Conclusion
@@ -276,9 +278,10 @@ comparison (train longer → label smoothing → DCGAN), and
   filter does real work rather than just looking different.
 - **The VAE** compresses a digit down to 20 numbers and decodes it back
   while preserving its identity almost entirely — a classifier that's 97.6%
-  accurate on originals is still 95.2% accurate on reconstructions. The
-  cost of that compression is blurriness, a known, expected property of the
-  pixel-wise reconstruction loss, not a bug.
+  accurate on originals is still ~93-95% accurate on reconstructions (this
+  varies a couple points between runs due to the VAE's stochastic sampling).
+  The cost of that compression is blurriness, a known, expected property of
+  the pixel-wise reconstruction loss, not a bug.
 - **The basic GAN** worked, but revealed real mode collapse (6/10 digit
   classes, a near-perfect 0.996 discriminator AUC meaning its fakes were
   easy to spot). Training longer made it worse. Label smoothing fixed the
