@@ -2,12 +2,29 @@
 
 **Author:** Udbhav Narawat
 
-A small classroom project exploring three different approaches to "AI + images":
-denoising with a pretrained filter (OIDN), reconstruction/generation with a
-Variational Autoencoder (VAE), and pure generation with a GAN. All three are
-kept as separate, independent modules — they solve different problems and
-aren't meant to be combined into one network — with a single Streamlit app
-tying them together.
+PIXEL AI implements and quantitatively evaluates three fundamentally
+different approaches to "AI + images" — pretrained denoising (OIDN),
+latent-space reconstruction/generation (VAE), and adversarial generation
+(GAN, with a baseline-vs-improved comparison) — kept as independent modules
+behind one Streamlit app, with every result backed by a real, reproducible
+number rather than just a picture.
+
+## Table of contents
+
+- [For the evaluator](#for-the-evaluator)
+- [Project overview](#project-overview)
+- [Architecture](#architecture)
+- [Project structure](#project-structure)
+- [Installation](#installation)
+- [Running the app](#running-the-app)
+- [Training](#training)
+- [Experimental configuration](#experimental-configuration)
+- [Results](#results)
+- [Model comparison](#model-comparison)
+- [Conclusion](#conclusion)
+- [Future experiments](#future-experiments)
+- [References](#references)
+- [Limitations](#limitations)
 
 ## For the evaluator
 
@@ -117,6 +134,33 @@ among other flags — see each module's README for the full list. A quick
 smoke test (`--epochs 1 --max-batches 5`) is useful for checking everything
 runs before committing to a full training run.
 
+## Experimental configuration
+
+Exact defaults from each script's `argparse` setup (not placeholders), and
+what the checkpoints actually committed to this repo were trained with —
+they don't always match, since the GAN checkpoints came out of a few rounds
+of experimentation (see `gan/README.md`).
+
+| | VAE | GAN — MLP | GAN — DCGAN |
+|---|---|---|---|
+| Dataset | MNIST | MNIST | MNIST |
+| Default epochs | 15 | 30 | 30 |
+| Epochs actually trained | 15 | 25 (resumed in stages) | 25 |
+| Batch size | 128 | 64 | 64 |
+| Learning rate | 1e-3 | 2e-4 | 2e-4 |
+| Optimizer | Adam | Adam (betas 0.5, 0.999) | Adam (betas 0.5, 0.999) |
+| Latent dimension | 20 | 100 | 100 |
+| Label smoothing | — | 0.9 (real-label target) | 0.9 (real-label target) |
+| Generator parameters | — | 1,510,032 | 766,017 |
+| Discriminator parameters | — | 533,505 | 138,817 |
+| VAE parameters | 228,905 | — | — |
+| Device | CPU/GPU auto | CPU/GPU auto | CPU/GPU auto |
+
+Worth noting: the DCGAN generator has *fewer* parameters than the MLP
+generator (766K vs. 1.51M) and still produces clearer, more diverse samples
+(see Results) — the improvement came from a better-suited architecture, not
+from throwing more capacity at the problem.
+
 ## Results
 
 All images below are produced by actually running the project's notebooks
@@ -224,6 +268,29 @@ comparison (train longer → label smoothing → DCGAN), and
 | OIDN  | Denoising                    | Noisy image             | Clean image                         | +6.45 dB PSNR vs. clean reference |
 | VAE   | Reconstruction / generation  | Image / latent vector   | Reconstruction / generated image    | 95.2% digit identity preserved (vs. 97.6% baseline) |
 | GAN   | Generation                   | Random noise            | Synthetic image                     | DCGAN: 10/10 digit classes, 81.9% confidence, discriminator AUC 0.944 (MLP: 6/10, 66.7%, AUC 0.996) |
+
+## Conclusion
+
+- **OIDN** measurably improves image quality with zero training on our end
+  — +6.45 dB PSNR on the bundled test image, confirming the pretrained
+  filter does real work rather than just looking different.
+- **The VAE** compresses a digit down to 20 numbers and decodes it back
+  while preserving its identity almost entirely — a classifier that's 97.6%
+  accurate on originals is still 95.2% accurate on reconstructions. The
+  cost of that compression is blurriness, a known, expected property of the
+  pixel-wise reconstruction loss, not a bug.
+- **The basic GAN** worked, but revealed real mode collapse (6/10 digit
+  classes, a near-perfect 0.996 discriminator AUC meaning its fakes were
+  easy to spot). Training longer made it worse. Label smoothing fixed the
+  training-stability symptom but not the underlying diversity problem.
+- **Switching to a DCGAN** — fewer parameters, just better-suited
+  (convolutional) layers — fixed what the loss-function tweaks couldn't:
+  10/10 digit classes, higher classifier confidence, and a discriminator
+  that has a harder time telling its fakes from real (AUC down to 0.944).
+- The overall takeaway: for this kind of problem, **architecture choice
+  mattered more than training duration or loss-function tuning** — the
+  quantitative metrics (accuracy, AUC, class coverage) confirmed what the
+  sample grids suggested visually, rather than just decorating the README.
 
 ## Future experiments
 
