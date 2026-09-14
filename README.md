@@ -67,8 +67,8 @@ PIXEL-AI/
 ├── oidn/                    OIDN inference (pretrained, no training script)
 ├── vae/                     VAE model, dataset, train, inference
 ├── gan/                     GAN model, dataset, train, inference
-├── notebooks/                01_OIDN.ipynb, 02_VAE.ipynb, 03_GAN.ipynb
-├── models/                   saved checkpoints (oidn/ has none — see its README)
+├── notebooks/                01_OIDN.ipynb, 02_VAE.ipynb, 03_GAN.ipynb, eval_utils.py (shared evaluation classifier)
+├── models/                   saved checkpoints (oidn/ has none — see its README; eval_classifier.pt is evaluation-only, not a project module)
 ├── results/                   saved plots and sample images from training
 └── data/                       downloaded datasets (MNIST etc., gitignored)
 ```
@@ -119,41 +119,91 @@ runs before committing to a full training run.
 
 ## Results
 
-**OIDN — noisy input vs. denoised output:**
+All images below are produced by actually running the project's notebooks
+(`notebooks/01_OIDN.ipynb`, `02_VAE.ipynb`, `03_GAN.ipynb`) against the real
+trained checkpoints — not hand-picked screenshots. Re-running any notebook
+regenerates the exact same files.
 
-<table>
-<tr>
-<td><img src="oidn/sample_images/sample_noisy.png" width="260" alt="Noisy sample"/><br/><sub>Before (noisy)</sub></td>
-<td><img src="results/oidn/sample_denoised.png" width="260" alt="Denoised sample"/><br/><sub>After (OIDN)</sub></td>
-</tr>
-</table>
+### OIDN
 
-**VAE — reconstruction and random latent-space samples:**
+Noisy input vs. OIDN's denoised output:
 
-<img src="results/vae/reconstructions.png" width="520" alt="VAE reconstructions"/>
+![Noisy sample](oidn/sample_images/sample_noisy.png)
+![Denoised sample](results/oidn/sample_denoised.png)
 
-<img src="results/vae/samples.png" width="260" alt="VAE random samples"/>
+**Quantitative result** — measured against a known clean reference image:
+
+![OIDN MSE/PSNR metrics](results/oidn/metrics.png)
+
+| | MSE (lower is better) | PSNR (higher is better) |
+|---|---|---|
+| Noisy vs. clean | 563.6 | 20.62 dB |
+| Denoised vs. clean | 127.7 | 27.07 dB |
+
+**PSNR improvement: +6.45 dB.**
+
+### VAE
+
+Top row: real test digits. Bottom row: the trained VAE's reconstruction of
+each one.
+
+![VAE reconstructions](results/vae/reconstructions.png)
+
+Random samples decoded from points sampled directly from the latent space
+(no input image at all):
+
+![VAE random samples](results/vae/samples.png)
+
+**Quantitative result** — a separate small digit classifier (trained only for
+this evaluation, not part of the VAE) checks whether it can still recognize
+the correct digit after an image has been fully compressed through the VAE's
+encoder and decoded back:
+
+![VAE reconstruction accuracy](results/vae/accuracy_comparison.png)
+
+| | Classifier accuracy |
+|---|---|
+| Original test images | 97.6% |
+| VAE reconstructions | 95.2% |
+
+Digit identity survives the full encode/decode round-trip with only a ~2.4
+point drop.
 
 *(training loss curve: `results/vae/loss_curve.png`)*
 
-**GAN — MLP (basic) vs. DCGAN (conv), same 25-epoch budget:**
+### GAN — MLP (basic) vs. DCGAN (conv), same 25-epoch training budget
 
-<table>
-<tr>
-<td><img src="results/gan/final_samples.png" width="260" alt="MLP GAN samples"/><br/><sub>MLP — speckled, mode-collapsed</sub></td>
-<td><img src="results/gan/final_samples_dcgan.png" width="260" alt="DCGAN samples"/><br/><sub>DCGAN — smoother, more variety</sub></td>
-</tr>
-</table>
+![MLP GAN samples](results/gan/final_samples.png)
+![DCGAN samples](results/gan/final_samples_dcgan.png)
 
-See `gan/README.md` → Experiments & findings for the full story behind that comparison, and `results/gan/epoch_XXX*.png` for samples across training.
+*(top: MLP — speckled, mode-collapsed. bottom: DCGAN — smoother, more variety.)*
+
+**Quantitative result** — same classifier as above, run on 200 freshly
+generated samples from each model, checking what digit (if any) it confidently
+recognizes:
+
+![GAN class distribution comparison](results/gan/class_distribution_comparison.png)
+
+| | Avg. classifier confidence | Digit classes seen (out of 10) |
+|---|---|---|
+| MLP (basic) | 66.7% | 6/10 |
+| DCGAN (conv) | 81.9% | 10/10 |
+
+The MLP GAN never produces anything the classifier recognizes as a 0, 1, 4,
+or 6 — direct numeric evidence of the mode collapse discussed below. The
+DCGAN covers all 10 digits with meaningfully higher confidence.
+
+See `gan/README.md` → Experiments & findings for the full story behind that
+comparison (train longer → label smoothing → DCGAN), and
+`results/gan/epoch_XXX*.png` for samples across training.
 
 ## Model comparison
 
-| Model | Purpose                     | Input                  | Output                            |
-|-------|------------------------------|-------------------------|-------------------------------------|
-| OIDN  | Denoising                    | Noisy image             | Clean image                         |
-| VAE   | Reconstruction / generation  | Image / latent vector   | Reconstruction / generated image    |
-| GAN   | Generation                   | Random noise            | Synthetic image                     |
+| Model | Purpose                     | Input                  | Output                            | Quantitative result |
+|-------|------------------------------|-------------------------|-------------------------------------|----------------------|
+| OIDN  | Denoising                    | Noisy image             | Clean image                         | +6.45 dB PSNR vs. clean reference |
+| VAE   | Reconstruction / generation  | Image / latent vector   | Reconstruction / generated image    | 95.2% digit identity preserved (vs. 97.6% baseline) |
+| GAN   | Generation                   | Random noise            | Synthetic image                     | DCGAN: 10/10 digit classes, 81.9% confidence (MLP: 6/10, 66.7%) |
 
 ## Future experiments
 
