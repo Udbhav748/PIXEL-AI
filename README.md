@@ -101,9 +101,33 @@ runs before committing to a full training run.
 
 ## Results
 
-- `results/vae/loss_curve.png`, `reconstructions.png`, `samples.png`
-- `results/gan/epoch_XXX.png` (samples across training), `final_samples.png`
-- `results/oidn/sample_denoised.png`
+**OIDN — noisy input vs. denoised output:**
+
+<table>
+<tr>
+<td><img src="oidn/sample_images/sample_noisy.png" width="260" alt="Noisy sample"/><br/><sub>Before (noisy)</sub></td>
+<td><img src="results/oidn/sample_denoised.png" width="260" alt="Denoised sample"/><br/><sub>After (OIDN)</sub></td>
+</tr>
+</table>
+
+**VAE — reconstruction and random latent-space samples:**
+
+<img src="results/vae/reconstructions.png" width="520" alt="VAE reconstructions"/>
+
+<img src="results/vae/samples.png" width="260" alt="VAE random samples"/>
+
+*(training loss curve: `results/vae/loss_curve.png`)*
+
+**GAN — MLP (basic) vs. DCGAN (conv), same 25-epoch budget:**
+
+<table>
+<tr>
+<td><img src="results/gan/final_samples.png" width="260" alt="MLP GAN samples"/><br/><sub>MLP — speckled, mode-collapsed</sub></td>
+<td><img src="results/gan/final_samples_dcgan.png" width="260" alt="DCGAN samples"/><br/><sub>DCGAN — smoother, more variety</sub></td>
+</tr>
+</table>
+
+See `gan/README.md` → Experiments & findings for the full story behind that comparison, and `results/gan/epoch_XXX*.png` for samples across training.
 
 ## Model comparison
 
