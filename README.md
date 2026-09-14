@@ -25,22 +25,6 @@ All three tabs (OIDN / VAE / GAN) work immediately — every checkpoint is
 already trained and committed to this repo, nothing needs to be trained
 first.
 
-**Assignment requirements checklist:**
-
-| Requirement | Status | Where |
-|---|---|---|
-| OIDN module (denoising) | ✅ working | `oidn/`, tab 1 in the app |
-| VAE module (reconstruction + generation) | ✅ trained & working | `vae/`, tab 2 in the app |
-| GAN module (generation) | ✅ trained & working | `gan/`, tab 3 in the app |
-| Single Streamlit app exposing all three | ✅ | `app/streamlit_app.py` |
-| Three modules kept conceptually separate | ✅ | see Project overview below |
-| Notebooks for all three modules | ✅ executed, no errors | `notebooks/` |
-| Model comparison | ✅ | Model comparison section below |
-| Teacher-provided references cited | ✅ | References section below |
-| No false claims about what each model does | ✅ | see Limitations, and each module's README |
-| Windows-friendly, no hardcoded absolute paths | ✅ | tested on Windows throughout |
-| Evidence of genuine experimentation (not just "ran once") | ✅ | `gan/README.md` → Experiments & findings — mode collapse was diagnosed and iterated on (train longer → label smoothing → DCGAN), with results and reasoning documented, not just a final output |
-
 ## Project overview
 
 - **OIDN** — takes a noisy image, removes the noise. Pretrained, no training
